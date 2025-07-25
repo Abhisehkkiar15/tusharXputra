@@ -1,22 +1,38 @@
-FROM python:3.10.8-slim-buster
 
-# System packages install (without musl-dev)
-RUN apt-get update -y && apt-get upgrade -y \
-    && apt-get install -y --no-install-recommends gcc libffi-dev ffmpeg aria2 python3-pip \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+# Use a Python 3.9.6 Alpine base image
+FROM python:3.12-alpine3.20
 
-# App code copy
-COPY . /app/
-WORKDIR /app/
+# Set the working directory
+WORKDIR /app
+
+# Copy all files from the current directory to the container's /app directory
+COPY . .
+
+# Install necessary dependencies
+RUN apk add --no-cache \
+    gcc \
+    libffi-dev \
+    musl-dev \
+    ffmpeg \
+    aria2 \
+    make \
+    g++ \
+    cmake && \
+    wget -q https://github.com/axiomatic-systems/Bento4/archive/v1.6.0-639.zip && \
+    unzip v1.6.0-639.zip && \
+    cd Bento4-1.6.0-639 && \
+    mkdir build && \
+    cd build && \
+    cmake .. && \
+    make -j$(nproc) && \
+    cp mp4decrypt /usr/local/bin/ &&\
+    cd ../.. && \
+    rm -rf Bento4-1.6.0-639 v1.6.0-639.zip
 
 # Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt \
-    && pip install --no-cache-dir pytube
+RUN pip3 install --no-cache-dir --upgrade pip \
+    && pip3 install --no-cache-dir --upgrade -r sainibots.txt \
+    && python3 -m pip install -U yt-dlp
 
-# Optional ENV
-ENV COOKIES_FILE_PATH="youtube_cookies.txt"
-
-# Start services
+# Set the command to run the application
 CMD ["sh", "-c", "gunicorn app:app & python3 main.py"]
